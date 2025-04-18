@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
 import "./index.css";
 function App() {
@@ -7,7 +7,21 @@ function App() {
   const [decompressedImage, setDecompressedImage] = useState(null);
   const [checked, setChecked] = useState(false);
   const fileInputRef = useRef(null);
+  useEffect(() => {
+    const deleteFilesInterval = setInterval(() => {
+      axios
+        .delete("http://localhost:5000/cleanup")
+        .then((response) => {
+          console.log(response.data.message); // Log success message
+        })
+        .catch((error) => {
+          console.error("Error deleting files:", error);
+        });
+    }, 1 * 60 * 1000); // 5 minutes in milliseconds
 
+    // Cleanup interval on unmount
+    return () => clearInterval(deleteFilesInterval);
+  }, []);
   const handleFileChange = (e) => {
     const selected = Array.from(e.target.files)
       .filter((f) => f && f.type)

@@ -7,7 +7,7 @@ const fs = require("fs");
 const dotenv = require("dotenv"); // To handle environment variables
 const { compressImage, decompressImage } = require("./pipeline.js"); // Import compression and decompression functions
 const { log } = require("console");
-
+const glob = require("glob");
 // Initialize dotenv for environment variables
 dotenv.config();
 
@@ -147,12 +147,6 @@ app.post("/decompress", upload.single("file"), async (req, res) => {
     // Your decompression logic goes here...
     await decompressImage(absoluteFilePath, decompressedFilePath);
 
-    // res.status(200).send({
-    //   message: "File decompressed successfully!",
-    //   decompressedImagePath: `/uploads/decompressed-${path.basename(
-    //     sanitizedFilePath
-    //   )}.png`,
-    // });
     res.sendFile(decompressedFilePath, (err) => {
       if (err) {
         console.error("Error sending decompressed file:", err);
@@ -167,6 +161,70 @@ app.post("/decompress", upload.single("file"), async (req, res) => {
       error: error.message,
     });
   }
+});
+
+app.delete("/cleanup", (req, res) => {
+  const uploadDirectoryPath = path.join(__dirname, "uploads");
+  const compressedDirectoryPath = path.join(uploadDirectoryPath, "compressed");
+
+  // Function to delete files from a given directory
+  const deleteFilesInDirectory = (directoryPath) => {
+    return new Promise((resolve, reject) => {
+      fs.readdir(directoryPath, (err, files) => {
+        if (err) {
+          console.error("Error reading directory:", err);
+          return reject(err); // Reject the promise if reading fails
+        }
+
+        // Filter out only image and json files
+        const filesToDelete = files.filter((file) =>
+          file.match(/\.(png|jpg|jpeg|gif|json)$/i)
+        );
+
+        if (filesToDelete.length === 0) {
+          console.log(`No files to delete in ${directoryPath}`);
+          return resolve(); // Resolve if no files to delete
+        }
+
+        // Deleting the files
+        const promises = filesToDelete.map((file) => {
+          const filePath = path.join(directoryPath, file);
+          return fs.promises
+            .unlink(filePath) // Using promises to delete files
+            .catch((unlinkErr) => {
+              console.error(`Error deleting file: ${file}`, unlinkErr);
+            });
+        });
+
+        // Wait for all deletions to finish
+        Promise.all(promises)
+          .then(() => {
+            console.log(`All files deleted in ${directoryPath}`);
+            resolve(); // Resolve after all deletions
+          })
+          .catch((cleanupErr) => {
+            console.error(
+              `Error during cleanup in ${directoryPath}:`,
+              cleanupErr
+            );
+            reject(cleanupErr); // Reject if there was an error during cleanup
+          });
+      });
+    });
+  };
+
+  // Delete files from both uploads and compressed directories
+  Promise.all([
+    deleteFilesInDirectory(uploadDirectoryPath),
+    deleteFilesInDirectory(compressedDirectoryPath),
+  ])
+    .then(() => {
+      res.send({ message: "Cleanup successful" });
+    })
+    .catch((err) => {
+      console.error("Error cleaning up:", err);
+      res.status(500).send({ message: "Error cleaning up files" });
+    });
 });
 
 // Start the server
