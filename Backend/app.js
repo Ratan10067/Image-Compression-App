@@ -147,11 +147,17 @@ app.post("/decompress", upload.single("file"), async (req, res) => {
     // Your decompression logic goes here...
     await decompressImage(absoluteFilePath, decompressedFilePath);
 
-    res.status(200).send({
-      message: "File decompressed successfully!",
-      decompressedImagePath: `/uploads/decompressed-${path.basename(
-        sanitizedFilePath
-      )}.png`,
+    // res.status(200).send({
+    //   message: "File decompressed successfully!",
+    //   decompressedImagePath: `/uploads/decompressed-${path.basename(
+    //     sanitizedFilePath
+    //   )}.png`,
+    // });
+    res.sendFile(decompressedFilePath, (err) => {
+      if (err) {
+        console.error("Error sending decompressed file:", err);
+        res.status(500).send({ message: "Error sending decompressed file." });
+      }
     });
   } catch (error) {
     console.error("Error during file decompression:", error);
