@@ -8,6 +8,8 @@ const dotenv = require("dotenv"); // To handle environment variables
 const { compressImage, decompressImage } = require("./pipeline.js"); // Import compression and decompression functions
 const { log } = require("console");
 const glob = require("glob");
+const serverless = require("serverless-http");
+
 // Initialize dotenv for environment variables
 dotenv.config();
 
@@ -230,9 +232,14 @@ app.delete("/cleanup", (req, res) => {
 });
 
 // Start the server
-app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
-});
+// app.listen(PORT, () => {
+//   console.log(`Server is running on http://localhost:${PORT}`);
+// });
+
+if (process.env.NODE_ENV !== "production") {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => console.log(`Local: http://localhost:${PORT}`));
+}
 
 module.exports = app;
 module.exports.handler = serverless(app);
