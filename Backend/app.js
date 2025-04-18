@@ -42,7 +42,9 @@ const upload = multer({ storage });
 
 // Serve uploaded files (images) from the 'uploads' directory
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-
+app.get("/api/test", (req, res) => {
+  res.send("Backend is working!");
+});
 // API endpoint for file upload and compression
 app.post("/upload", upload.array("files"), async (req, res) => {
   try {
