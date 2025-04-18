@@ -1,30 +1,47 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import axios from "axios";
 
 function App() {
   const [files, setFiles] = useState([]);
   const [uploadStatus, setUploadStatus] = useState(null);
+  const fileInputRef = useRef(null);
 
   const handleFileChange = (e) => {
-    setFiles([...e.target.files]);
+    const selectedFiles = Array.from(e.target.files).map((file) => ({
+      file,
+      preview: file.type.startsWith("image/")
+        ? URL.createObjectURL(file)
+        : null,
+    }));
+    setFiles((prevFiles) => [...prevFiles, ...selectedFiles]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
-    const droppedFiles = Array.from(e.dataTransfer.files);
+    const droppedFiles = Array.from(e.dataTransfer.files).map((file) => ({
+      file,
+      preview: file.type.startsWith("image/")
+        ? URL.createObjectURL(file)
+        : null,
+    }));
     setFiles((prevFiles) => [...prevFiles, ...droppedFiles]);
   };
 
   const handleClear = () => {
     setFiles([]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   const handleUpload = async () => {
     const formData = new FormData();
-    files.forEach((file) => {
+    files.forEach(({ file }) => {
       formData.append("files", file);
     });
-    console.log(formData, files);
 
     try {
       const response = await axios.post(
@@ -40,8 +57,11 @@ function App() {
         success: true,
         message: "Files uploaded successfully!",
       });
-      console.log(response.data); // Handle the response
-      setFiles([]); // Clear the file queue
+      console.log(response.data);
+      setFiles([]);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     } catch (error) {
       setUploadStatus({ success: false, message: "Error uploading files!" });
       console.error("Error uploading files:", error);
@@ -51,9 +71,7 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-100 text-gray-800 font-sans px-4 py-10">
       <div className="max-w-3xl mx-auto text-center">
-        <div className="flex justify-center mb-6">
-          {/* <img src="/logo.svg" alt="Logo" className="w-48 h-auto" /> */}
-        </div>
+        <div className="flex justify-center mb-6">{/* Logo placeholder */}</div>
 
         <h1 className="text-2xl font-bold mb-4">
           Image Upload and Compression
@@ -67,6 +85,7 @@ function App() {
               multiple
               className="hidden"
               onChange={handleFileChange}
+              ref={fileInputRef}
             />
           </label>
           <button
@@ -82,20 +101,37 @@ function App() {
           onDragOver={(e) => e.preventDefault()}
           onDrop={handleDrop}
         >
-          <p className="text-blue-500 font-semibold">
-            Drag and drop your files here
-          </p>
-        </div>
-
-        <div className="mt-4">
-          {files.length > 0 && (
-            <ul className="text-left text-sm text-gray-700">
+          {files.length > 0 ? (
+            <div className="grid grid-cols-3 gap-4">
               {files.map((file, index) => (
-                <li key={index} className="mb-1">
-                  {file.name} ({(file.size / 1024).toFixed(2)} KB)
-                </li>
+                <div
+                  key={index}
+                  className="relative border rounded-lg overflow-hidden shadow-sm"
+                >
+                  {file.preview ? (
+                    <img
+                      src={file.preview}
+                      alt={file.file.name}
+                      className="w-full h-32 object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-32 bg-gray-200 flex items-center justify-center text-gray-500">
+                      <p className="text-sm">{file.file.name}</p>
+                    </div>
+                  )}
+                  <div className="bg-white p-2 text-center">
+                    <p className="text-sm truncate">{file.file.name}</p>
+                    <p className="text-xs text-gray-500">
+                      {(file.file.size / 1024).toFixed(2)} KB
+                    </p>
+                  </div>
+                </div>
               ))}
-            </ul>
+            </div>
+          ) : (
+            <p className="text-blue-500 font-semibold">
+              Drag and drop your files here
+            </p>
           )}
         </div>
 
@@ -123,12 +159,13 @@ function App() {
           </div>
         )}
       </div>
+
       <div className="flex flex-col items-center mt-10 w-1/2 mx-auto">
         <div className="mt-10 text-left">
           <h2 className="text-xl font-bold mb-2">Image Compression</h2>
           <p className="text-gray-700 text-sm">
             In terms of digital files, compression is the act of encoding
-            information using fewer bits than what's found in the original file.
+            information using fewer bits than what’s found in the original file.
             Simply put, it means converting a large file into a smaller file.
             <br />
             <br />
@@ -173,9 +210,10 @@ function App() {
           </p>
         </div>
       </div>
+
       <footer className="mt-10 text-center text-gray-600 text-sm">
         <p>All uploaded files will be deleted after 1 hour.</p>
-        <p>All rights reserved © 2025 Lossy & Lossless Image Compression</p>
+        <p>All rights reserved © 2025 Image Upload and Compression</p>
       </footer>
     </div>
   );
