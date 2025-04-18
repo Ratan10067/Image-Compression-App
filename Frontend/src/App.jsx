@@ -1,7 +1,9 @@
-import { React, useState } from "react";
+import React, { useState } from "react";
+import axios from "axios";
 
 function App() {
   const [files, setFiles] = useState([]);
+  const [uploadStatus, setUploadStatus] = useState(null);
 
   const handleFileChange = (e) => {
     setFiles([...e.target.files]);
@@ -17,25 +19,49 @@ function App() {
     setFiles([]);
   };
 
+  const handleUpload = async () => {
+    const formData = new FormData();
+    files.forEach((file) => {
+      formData.append("files", file);
+    });
+    console.log(formData, files);
+
+    try {
+      const response = await axios.post(
+        "http://localhost:5000/upload",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+      setUploadStatus({
+        success: true,
+        message: "Files uploaded successfully!",
+      });
+      console.log(response.data); // Handle the response
+      setFiles([]); // Clear the file queue
+    } catch (error) {
+      setUploadStatus({ success: false, message: "Error uploading files!" });
+      console.error("Error uploading files:", error);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-white text-gray-800 font-sans px-4 py-10">
+    <div className="min-h-screen bg-gray-100 text-gray-800 font-sans px-4 py-10">
       <div className="max-w-3xl mx-auto text-center">
         <div className="flex justify-center mb-6">
-          <img src="/logo.svg" alt="" className="w-48 h-auto" />
+          {/* <img src="/logo.svg" alt="Logo" className="w-48 h-auto" /> */}
         </div>
 
-        <h1 className="text-2xl font-bold mb-2">
-          Lossy & Lossless Image Compression
+        <h1 className="text-2xl font-bold mb-4">
+          Image Upload and Compression
         </h1>
-        <p className="text-sm text-gray-600 mb-6">
-          This online image optimizer uses a smart combination of the best
-          optimization and lossy compression algorithms to shrink JPEG, GIF, and
-          PNG images.
-        </p>
 
-        <div className="flex justify-center gap-4 mb-4">
+        <div className="flex justify-center gap-4 mb-6">
           <label className="px-4 py-2 bg-blue-500 text-white font-semibold rounded cursor-pointer hover:bg-blue-600">
-            Upload Files
+            Select Files
             <input
               type="file"
               multiple
@@ -44,7 +70,7 @@ function App() {
             />
           </label>
           <button
-            className="px-4 py-2 bg-red-200 text-red-800 font-semibold rounded hover:bg-red-300"
+            className="px-4 py-2 bg-red-500 text-white font-semibold rounded hover:bg-red-600"
             onClick={handleClear}
           >
             Clear Queue
@@ -56,16 +82,48 @@ function App() {
           onDragOver={(e) => e.preventDefault()}
           onDrop={handleDrop}
         >
-          <p className="text-blue-500 font-semibold">Drop Your Files Here</p>
+          <p className="text-blue-500 font-semibold">
+            Drag and drop your files here
+          </p>
+        </div>
+
+        <div className="mt-4">
+          {files.length > 0 && (
+            <ul className="text-left text-sm text-gray-700">
+              {files.map((file, index) => (
+                <li key={index} className="mb-1">
+                  {file.name} ({(file.size / 1024).toFixed(2)} KB)
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         <button
-          className="mt-6 px-6 py-2 bg-gray-300 text-gray-600 rounded-lg cursor-not-allowed"
-          disabled
+          className={`mt-6 px-6 py-2 rounded-lg font-semibold ${
+            files.length === 0
+              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+              : "bg-green-500 text-white hover:bg-green-600"
+          }`}
+          onClick={handleUpload}
+          disabled={files.length === 0}
         >
-          Download All ({files.length})
+          Upload Files ({files.length})
         </button>
 
+        {uploadStatus && (
+          <div
+            className={`mt-4 p-4 rounded ${
+              uploadStatus.success
+                ? "bg-green-100 text-green-800"
+                : "bg-red-100 text-red-800"
+            }`}
+          >
+            {uploadStatus.message}
+          </div>
+        )}
+      </div>
+      <div className="flex flex-col items-center mt-10 w-1/2 mx-auto">
         <div className="mt-10 text-left">
           <h2 className="text-xl font-bold mb-2">Image Compression</h2>
           <p className="text-gray-700 text-sm">
@@ -84,64 +142,39 @@ function App() {
             final file to be will depend on how much loss of quality you’re
             comfortable with.
           </p>
-          <div className="mt-4">
-            <h2 className="text-xl font-bold mb-2">
-              Why would you want to compress images?
-            </h2>
-            <p className="text-gray-700 text-sm">
-              Depending on the source of an image, the file could be quite
-              large. A JPG from a professional DSLR camera, for example, could
-              be dozens of megabytes. Depending on your needs, this could be too
-              big. Compressing this image would be very useful.
-              <br />
-              <br />
-              Likewise, you might have large images on your phone. These images
-              could be taking up a lot of hard drive space and preventing you
-              from taking more photos. Compressing them could free up more
-              internal storage, fixing this problem.
-            </p>
-          </div>
-          <div className="mt-4">
-            <h2 className="text-xl font-bold mb-2">
-              How does the image compressor work?
-            </h2>
-            <p className="text-gray-700 text-sm">
-              Our tool uses lossy compression to shrink down image files. It
-              supports three file types: PNG, JPG/JPEG, and GIF. This system
-              intelligently analyzes uploaded images and reduces them to the
-              smallest possible file size without negatively affecting the
-              overall quality.
-              <br />
-              <br />
-              To begin, you’ll need to upload some images you’d like to
-              compress. You can upload up to 20 images at once and you can feel
-              free to mix and match file types. In other words, you don’t need
-              to only upload JPGs and wait to upload PNGs. Our server can
-              automatically parse out the files for you.
-              <br />
-              <br />
-              First, hit the “Upload Files” button and navigate to your images.
-              Once uploaded, you’ll see thumbnails for all your images arriving
-              in the queue. You’ll be able to see their real-time progress as
-              our server analyzes them.
-            </p>
-          </div>
-          <div className="mt-4">
-            <h2 className="text-xl font-bold mb-2">
-              Is it safe to compress images?
-            </h2>
-            <p className="text-gray-700 text-sm">
-              There is no need to be worried about the safety of our free
-              service. Your original files will stay untouched on your system,
-              so if you are unhappy with your compressed files, you can simply
-              try again. Also, our unmanned system purges all data after one
-              hour, so you don’t need to worry about the security of your data.
-            </p>
-          </div>
+        </div>
+        <div className="mt-4 text-left">
+          <h2 className="text-xl font-bold mb-2">
+            Why would you want to compress images?
+          </h2>
+          <p className="text-gray-700 text-sm">
+            Depending on the source of an image, the file could be quite large.
+            A JPG from a professional DSLR camera, for example, could be dozens
+            of megabytes. Depending on your needs, this could be too big.
+            Compressing this image would be very useful.
+            <br />
+            <br />
+            Likewise, you might have large images on your phone. These images
+            could be taking up a lot of hard drive space and preventing you from
+            taking more photos. Compressing them could free up more internal
+            storage, fixing this problem.
+          </p>
+        </div>
+        <div className="mt-4 text-left">
+          <h2 className="text-xl font-bold mb-2">
+            Is it safe to compress images?
+          </h2>
+          <p className="text-gray-700 text-sm">
+            There is no need to be worried about the safety of our free service.
+            Your original files will stay untouched on your system, so if you
+            are unhappy with your compressed files, you can simply try again.
+            Also, our unmanned system purges all data after one hour, so you
+            don’t need to worry about the security of your data.
+          </p>
         </div>
       </div>
       <footer className="mt-10 text-center text-gray-600 text-sm">
-        <p>All uploaded images will be automatically deleted after 1 hour.</p>
+        <p>All uploaded files will be deleted after 1 hour.</p>
         <p>All rights reserved © 2025 Lossy & Lossless Image Compression</p>
       </footer>
     </div>
