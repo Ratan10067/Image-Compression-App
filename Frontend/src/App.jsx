@@ -10,7 +10,7 @@ function App() {
   useEffect(() => {
     const deleteFilesInterval = setInterval(() => {
       axios
-        .delete("https://image-compression-app-kappa.vercel.app//cleanup")
+        .delete("https://image-compression-app-delta.vercel.app/api/cleanup")
         .then((response) => {
           console.log(response.data.message); // Log success message
         })
@@ -60,7 +60,7 @@ function App() {
     files.forEach(({ file }) => formData.append("files", file));
     try {
       const { data } = await axios.post(
-        "https://image-compression-app-kappa.vercel.app//upload",
+        "https://image-compression-app-delta.vercel.app/api/upload",
         formData,
         { headers: { "Content-Type": "multipart/form-data" } }
       );
@@ -76,7 +76,7 @@ function App() {
     if (!decompressedImage) return alert("Upload first!");
     try {
       const { data } = await axios.post(
-        "https://image-compression-app-kappa.vercel.app//decompress",
+        "https://image-compression-app-delta.vercel.app/api/decompress",
         { filePath: decompressedImage },
         {
           headers: { "Content-Type": "application/json" },
