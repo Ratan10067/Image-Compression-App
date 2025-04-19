@@ -5,7 +5,8 @@ const cors = require("cors");
 const fs = require("fs");
 const os = require("os");
 const dotenv = require("dotenv");
-const { compressImage, decompressImage } = require("./pipeline.js");
+const { compressJPEG2000, decompressJPEG2000 } = require("./pipeline.js");
+const { compressLossless, decompressLossless } = require("./lossless.js");
 const serverless = require("serverless-http");
 
 dotenv.config();
@@ -49,14 +50,20 @@ app.post("/api/upload", upload.array("files"), async (req, res) => {
     }
 
     const uploadedFiles = [];
-
+    console.log(req.body);
+    const compressionType = req.body.type || "lossy";
     for (let file of req.files) {
       const compressedFilePath = path.join(
         COMPRESSED_DIR,
         `compressed-${file.filename}.json`
       );
-
-      await compressImage(file.path, compressedFilePath);
+      const quality = parseInt(req.body.quality || 75, 10); // default to 75
+      console.log(compressionType, quality);
+      if (compressionType === "lossless") {
+        await compressLossless(file.path, compressedFilePath, quality); // Example lossless function
+      } else {
+        await compressJPEG2000(file.path, compressedFilePath, quality); // Example lossy function
+      }
 
       uploadedFiles.push({
         originalName: file.originalname,
@@ -82,8 +89,8 @@ app.post("/api/upload", upload.array("files"), async (req, res) => {
 
 app.post("/api/decompress", upload.single("file"), async (req, res) => {
   try {
-    const { filePath } = req.body;
-
+    const { filePath, compressionType } = req.body;
+    console.log(req.body);
     if (!filePath) {
       return res
         .status(400)
@@ -108,8 +115,11 @@ app.post("/api/decompress", upload.single("file"), async (req, res) => {
       UPLOADS_DIR,
       `decompressed-${path.basename(sanitizedFilePath)}.png`
     );
-
-    await decompressImage(absoluteFilePath, decompressedFilePath);
+    if (compressionType === "lossless") {
+      await decompressLossless(absoluteFilePath, decompressedFilePath); // Your lossless function
+    } else {
+      await decompressJPEG2000(absoluteFilePath, decompressedFilePath); // Your lossy function
+    }
 
     res.sendFile(decompressedFilePath, (err) => {
       if (err) {
@@ -154,9 +164,9 @@ app.delete("/api/cleanup", (req, res) => {
     });
 });
 
+app.listen(PORT, () => console.log(`Local: http://localhost:${PORT}`));
 if (process.env.NODE_ENV !== "production") {
-  app.listen(PORT, () => console.log(`Local: http://localhost:${PORT}`));
 }
 
-module.exports = app;
-module.exports.handler = serverless(app);
+// module.exports = app;
+// module.exports.handler = serverless(app);

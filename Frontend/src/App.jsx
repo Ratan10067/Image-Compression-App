@@ -6,11 +6,13 @@ function App() {
   const [uploadStatus, setUploadStatus] = useState(null);
   const [decompressedImage, setDecompressedImage] = useState(null);
   const [checked, setChecked] = useState(false);
+  const [quality, setQuality] = useState(75); // default quality
+  const [compressionType, setCompressionType] = useState("lossy"); // default
   const fileInputRef = useRef(null);
   useEffect(() => {
     const deleteFilesInterval = setInterval(() => {
       axios
-        .delete("https://image-compression-app-delta.vercel.app/api/cleanup")
+        .delete("http://localhost:5000/api/cleanup")
         .then((response) => {
           console.log(response.data.message); // Log success message
         })
@@ -58,9 +60,11 @@ function App() {
   const handleUpload = async () => {
     const formData = new FormData();
     files.forEach(({ file }) => formData.append("files", file));
+    formData.append("quality", quality);
+    formData.append("type", compressionType);
     try {
       const { data } = await axios.post(
-        "https://image-compression-app-delta.vercel.app/api/upload",
+        "http://localhost:5000/api/upload",
         formData,
         { headers: { "Content-Type": "multipart/form-data" } }
       );
@@ -76,8 +80,8 @@ function App() {
     if (!decompressedImage) return alert("Upload first!");
     try {
       const { data } = await axios.post(
-        "https://image-compression-app-delta.vercel.app/api/decompress",
-        { filePath: decompressedImage },
+        "http://localhost:5000/api/decompress",
+        { filePath: decompressedImage, compressionType: compressionType },
         {
           headers: { "Content-Type": "application/json" },
           responseType: "blob",
@@ -156,6 +160,59 @@ function App() {
           ) : (
             <p className="text-center text-blue-400">Drag & drop files here</p>
           )}
+        </div>
+        <div className="upload-section">
+          <input type="file" onChange={handleFileChange} className="mb-4" />
+
+          {/* 🔽 Compression Type Buttons go here */}
+          <div className="flex gap-4 mb-4">
+            <button
+              onClick={() => setCompressionType("lossless")}
+              className={`px-4 py-2 rounded ${
+                compressionType === "lossless"
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-200"
+              }`}
+            >
+              Lossless Compression
+            </button>
+            <button
+              onClick={() => setCompressionType("lossy")}
+              className={`px-4 py-2 rounded ${
+                compressionType === "lossy"
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-200"
+              }`}
+            >
+              Lossy Compression
+            </button>
+          </div>
+
+          {/* Optional helper text */}
+          <p className="text-sm text-gray-500 mb-4">
+            <strong>Lossless:</strong> No quality loss, larger size. <br />
+            <strong>Lossy:</strong> Smaller size, slight quality trade-off.
+          </p>
+        </div>
+
+        <p className="text-sm text-gray-500 mt-1">
+          <span className="font-medium">Tip:</span> Quality 90+ preserves most
+          details. Quality 30–50 gives small size with decent clarity.
+        </p>
+
+        <div className="mb-4">
+          <label className="block mb-1 text-sm font-medium text-gray-700">
+            Compression Quality: {quality}
+          </label>
+          <input
+            type="range"
+            min={10}
+            max={100}
+            step={5}
+            value={quality}
+            onChange={(e) => setQuality(Number(e.target.value))}
+            className="w-full"
+          />
         </div>
 
         {/* Action Buttons */}

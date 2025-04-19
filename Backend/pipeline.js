@@ -1,228 +1,136 @@
 const fs = require("fs");
 const sharp = require("sharp");
-const { DCT, IDCT } = require("dct2");
-const blockSize = 8;
 
-// Standard JPEG quant matrix
-const Qbase = [
-  [16, 11, 10, 16, 24, 40, 51, 61],
-  [12, 12, 14, 19, 26, 58, 60, 55],
-  [14, 13, 16, 24, 40, 57, 69, 56],
-  [14, 17, 22, 29, 51, 87, 80, 62],
-  [18, 22, 37, 56, 68, 109, 103, 77],
-  [24, 35, 55, 64, 81, 104, 113, 92],
-  [49, 64, 78, 87, 103, 121, 120, 101],
-  [72, 92, 95, 98, 112, 100, 103, 99],
-];
+//–– Helper Functions for Haar Wavelet Transform ––
 
-//–– Quant matrix generator ––
-function makeQuantMatrix(quality) {
-  const scale = quality < 50 ? 5000 / quality : 200 - quality * 2;
-  return Qbase.map((row) =>
-    row.map((v) => Math.max(1, Math.floor((v * scale + 50) / 100)))
-  );
-}
+function haarWavelet2D(matrix) {
+  const rows = matrix.length;
+  const cols = matrix[0].length;
+  const transformed = Array.from({ length: rows }, () => Array(cols).fill(0));
 
-//–– Precompute zig‑zag index order for an 8×8 block ––
-const zigzagIndex = (() => {
-  const coords = [];
-  let up = true;
-  for (let sum = 0; sum <= 14; sum++) {
-    if (up) {
-      for (let i = 0; i <= sum; i++) {
-        const j = sum - i;
-        if (i < 8 && j < 8) coords.push([i, j]);
-      }
-    } else {
-      for (let j = 0; j <= sum; j++) {
-        const i = sum - j;
-        if (i < 8 && j < 8) coords.push([i, j]);
-      }
+  // Horizontal transform
+  for (let i = 0; i < rows; i++) {
+    const row = matrix[i];
+    const temp = [];
+    for (let j = 0; j < cols / 2; j++) {
+      temp[j] = (row[2 * j] + row[2 * j + 1]) / 2; // Approximation
+      temp[j + cols / 2] = (row[2 * j] - row[2 * j + 1]) / 2; // Detail
     }
-    up = !up;
+    transformed[i] = temp;
   }
-  return coords;
-})();
 
-//–– Flatten an 8×8 to 1‑D via zig‑zag ––
-function zigzagFlatten(block) {
-  return zigzagIndex.map(([i, j]) => block[i][j]);
-}
-
-//–– Reconstruct 8×8 from a zig‑zag array ––
-function zigzagUnflatten(arr) {
-  const block = Array.from({ length: 8 }, (_) => Array(8).fill(0));
-  zigzagIndex.forEach(([i, j], k) => (block[i][j] = arr[k]));
-  return block;
-}
-
-//–– RLE encode a 1‑D array ––
-function rleEncode(arr) {
-  const out = [];
-  let run = 1;
-  for (let i = 1; i < arr.length; i++) {
-    if (arr[i] === arr[i - 1]) run++;
-    else {
-      out.push([arr[i - 1], run]);
-      run = 1;
+  // Vertical transform
+  for (let j = 0; j < cols; j++) {
+    const temp = [];
+    for (let i = 0; i < rows / 2; i++) {
+      temp[i] = (transformed[2 * i][j] + transformed[2 * i + 1][j]) / 2; // Approximation
+      temp[i + rows / 2] =
+        (transformed[2 * i][j] - transformed[2 * i + 1][j]) / 2; // Detail
+    }
+    for (let i = 0; i < rows; i++) {
+      transformed[i][j] = temp[i];
     }
   }
-  out.push([arr[arr.length - 1], run]);
-  return out;
+
+  return transformed;
 }
 
-//–– RLE decode back to 1‑D ––
-function rleDecode(pairs) {
-  const out = [];
-  pairs.forEach(([val, run]) => {
-    for (let k = 0; k < run; k++) out.push(val);
-  });
-  return out;
+function inverseHaarWavelet2D(matrix) {
+  const rows = matrix.length;
+  const cols = matrix[0].length;
+  const reconstructed = Array.from({ length: rows }, () => Array(cols).fill(0));
+
+  // Vertical inverse transform
+  for (let j = 0; j < cols; j++) {
+    const temp = [];
+    for (let i = 0; i < rows / 2; i++) {
+      temp[2 * i] = matrix[i][j] + matrix[i + rows / 2][j];
+      temp[2 * i + 1] = matrix[i][j] - matrix[i + rows / 2][j];
+    }
+    for (let i = 0; i < rows; i++) {
+      reconstructed[i][j] = temp[i];
+    }
+  }
+
+  // Horizontal inverse transform
+  for (let i = 0; i < rows; i++) {
+    const temp = [];
+    for (let j = 0; j < cols / 2; j++) {
+      temp[2 * j] = reconstructed[i][j] + reconstructed[i][j + cols / 2];
+      temp[2 * j + 1] = reconstructed[i][j] - reconstructed[i][j + cols / 2];
+    }
+    reconstructed[i] = temp;
+  }
+
+  return reconstructed;
 }
 
-//–– Build a trivial “Huffman” codebook from the set of values ––
-function buildCodebook(pairs) {
-  // collect frequencies
-  const freq = new Map();
-  pairs.flat().forEach(([val, count]) => {
-    freq.set(val, (freq.get(val) || 0) + count);
-  });
-  // sort descending
-  const symbols = [...freq.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .map(([val]) => val);
-  // assign each symbol a unique binary string = its index in base‑2
-  const codebook = {};
-  symbols.forEach((val, i) => {
-    codebook[val] = i.toString(2);
-  });
-  // also build inverse
-  const inverse = Object.fromEntries(
-    Object.entries(codebook).map(([v, code]) => [code, parseInt(v, 10)])
-  );
-  return { codebook, inverse };
-}
-
-//–– Main compression function ––
-async function compressImage(inputPath, outputJSON, quality = 75) {
+//–– JPEG 2000 Compression ––
+async function compressJPEG2000(inputPath, outputJSON, quality = 75) {
   const { data, info } = await sharp(inputPath)
     .greyscale()
     .raw()
     .toBuffer({ resolveWithObject: true });
-  const w = info.width,
-    h = info.height;
-  const w8 = Math.ceil(w / blockSize) * blockSize;
-  const h8 = Math.ceil(h / blockSize) * blockSize;
-  const Q = makeQuantMatrix(quality);
 
-  // pad to multiples of 8
-  const M = Array.from({ length: h8 }, (_, y) =>
-    Array.from({ length: w8 }, (_, x) => (y < h && x < w ? data[y * w + x] : 0))
-  );
+  const width = info.width;
+  const height = info.height;
+  const paddedWidth = Math.ceil(width / 2) * 2; // Ensure even dimensions for DWT
+  const paddedHeight = Math.ceil(height / 2) * 2;
 
-  // STEP 1–4: DCT → Quantize → Zigzag → RLE
-  const allRLE = [];
-  for (let by = 0, k = 0; by < h8; by += blockSize) {
-    for (let bx = 0; bx < w8; bx += blockSize, k++) {
-      // extract
-      const block = M.slice(by, by + 8).map((r) => r.slice(bx, bx + 8));
-      // DCT
-      const coeff = DCT(block);
-      // quantize
-      const qblk = coeff.map((row, i) =>
-        row.map((c, j) => Math.round(c / Q[i][j]))
-      );
-      // zig‑zag + RLE
-      const zz = zigzagFlatten(qblk);
-      const rle = rleEncode(zz);
-      allRLE.push(rle);
-    }
-  }
-
-  // STEP 5: build codebook + encode
-  const { codebook, inverse } = buildCodebook(allRLE);
-  const encoded = allRLE.map((rle) =>
-    rle.map(([val, run]) => ({
-      code: codebook[val],
-      run,
-    }))
-  );
-
-  // write out a single JSON
-  fs.writeFileSync(
-    outputJSON,
-    JSON.stringify(
-      {
-        width: w,
-        height: h,
-        width8: w8,
-        height8: h8,
-        quality,
-        codebook,
-        encoded,
-      },
-      null,
-      2
+  const imageMatrix = Array.from({ length: paddedHeight }, (_, y) =>
+    Array.from({ length: paddedWidth }, (_, x) =>
+      y < height && x < width ? data[y * width + x] : 0
     )
   );
-  console.log("✅ Compression complete:", outputJSON);
-}
 
-//–– Main decompression function ––
-async function decompressImage(inputJSON, outputImage) {
-  const {
-    width: w,
-    height: h,
-    width8: w8,
-    height8: h8,
-    quality,
-    codebook: cb,
-    encoded,
-  } = JSON.parse(fs.readFileSync(inputJSON, "utf8"));
-  const Q = makeQuantMatrix(quality);
+  // Step 1: Apply Discrete Wavelet Transform
+  const dwtMatrix = haarWavelet2D(imageMatrix);
 
-  // invert codebook
-  const inverse = Object.fromEntries(
-    Object.entries(cb).map(([val, code]) => [code, Number(val)])
+  // Step 2: Quantization
+  const quantized = dwtMatrix.map((row) =>
+    row.map((value) => Math.round(value / (100 / quality)))
   );
 
-  // reconstruct matrix
-  const M = Array.from({ length: h8 }, () => Array(w8).fill(0));
-  let idx = 0;
-  for (let by = 0; by < h8; by += 8) {
-    for (let bx = 0; bx < w8; bx += 8) {
-      const rle = encoded[idx++];
-      // decode Huffman→RLE pairs
-      const pairs = rle.map(({ code, run }) => [inverse[code], run]);
-      // recover 64‑long zigzag array
-      const zz = rleDecode(pairs);
-      // un‑zigzag → quant block
-      const qblk = zigzagUnflatten(zz);
-      // dequantize
-      const coeff = qblk.map((row, i) => row.map((c, j) => c * Q[i][j]));
-      // inverse DCT → spatial block
-      const block = IDCT(coeff);
-      // copy back (clamp)
-      for (let i = 0; i < 8; i++) {
-        for (let j = 0; j < 8; j++) {
-          const v = Math.round(block[i][j]);
-          M[by + i][bx + j] = Math.min(255, Math.max(0, v));
-        }
-      }
+  // Step 3: Serialize data to JSON
+  fs.writeFileSync(
+    outputJSON,
+    JSON.stringify({ width, height, quantized, quality }),
+    "utf8"
+  );
+
+  console.log("✅ JPEG 2000 compression complete:", outputJSON);
+}
+
+//–– JPEG 2000 Decompression ––
+async function decompressJPEG2000(inputJSON, outputPath) {
+  const { width, height, quantized, quality } = JSON.parse(
+    fs.readFileSync(inputJSON, "utf8")
+  );
+
+  // Step 1: Dequantization
+  const dequantized = quantized.map((row) =>
+    row.map((value) => value * (100 / quality))
+  );
+
+  // Step 2: Apply Inverse Discrete Wavelet Transform
+  const reconstructed = inverseHaarWavelet2D(dequantized);
+
+  // Step 3: Convert matrix back to buffer
+  const buffer = Buffer.alloc(width * height);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      buffer[y * width + x] = Math.min(
+        255,
+        Math.max(0, Math.round(reconstructed[y][x]))
+      );
     }
   }
 
-  // flatten and trim to original size
-  const flat = Buffer.from([].concat(...M).slice(0, h8 * w8)).filter((_, i) => {
-    const y = Math.floor(i / w8);
-    const x = i % w8;
-    return x < w && y < h;
-  });
+  await sharp(buffer, { raw: { width, height, channels: 1 } })
+    .toFile(outputPath)
+    .catch((err) => console.error("Error writing image:", err));
 
-  await sharp(flat, { raw: { width: w, height: h, channels: 1 } }).toFile(
-    outputImage
-  );
-  console.log("✅ Decompression complete:", outputImage);
+  console.log("✅ JPEG 2000 decompression complete:", outputPath);
 }
 
-module.exports = { compressImage, decompressImage };
+module.exports = { compressJPEG2000, decompressJPEG2000 };
