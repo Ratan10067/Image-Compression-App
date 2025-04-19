@@ -1,6 +1,6 @@
 ## 🚀 Live Demo
 
-The project is successfully deployed and accessible at [Live Demo](https://your-deployment-url.com).  
+The project is successfully deployed and accessible at [Live Demo](https://image-compression-app-xcc3.vercel.app/).  
 Explore both **Lossless** and **Lossy** image compression in action!
 
 Each folder contains its own `README.md` file with detailed instructions for setup and usage specific to that part of the application.
