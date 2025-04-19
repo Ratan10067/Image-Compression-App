@@ -110,7 +110,7 @@ function App() {
 
         {/* Upload Controls */}
         <div className="flex flex-wrap justify-center gap-4 mb-6">
-          <label className="btn-primary">
+          <label className="btn-primary cursor-pointer">
             Select Files
             <input
               type="file"
@@ -120,7 +120,10 @@ function App() {
               ref={fileInputRef}
             />
           </label>
-          <button className="btn-secondary" onClick={handleClear}>
+          <button
+            className="btn-secondary cursor-pointer"
+            onClick={handleClear}
+          >
             Clear Queue
           </button>
         </div>
@@ -168,7 +171,7 @@ function App() {
           <div className="flex gap-4 mb-4">
             <button
               onClick={() => setCompressionType("lossless")}
-              className={`px-4 py-2 rounded ${
+              className={`px-4 py-2 rounded cursor-pointer ${
                 compressionType === "lossless"
                   ? "bg-blue-600 text-white"
                   : "bg-gray-200"
@@ -178,7 +181,7 @@ function App() {
             </button>
             <button
               onClick={() => setCompressionType("lossy")}
-              className={`px-4 py-2 rounded ${
+              className={`px-4 py-2 rounded cursor-pointer ${
                 compressionType === "lossy"
                   ? "bg-blue-600 text-white"
                   : "bg-gray-200"
@@ -211,7 +214,7 @@ function App() {
             step={5}
             value={quality}
             onChange={(e) => setQuality(Number(e.target.value))}
-            className="w-full"
+            className="w-full cursor-pointer"
           />
         </div>
 
@@ -219,7 +222,7 @@ function App() {
         <div className="flex justify-center gap-4 mb-6">
           {!uploadStatus?.success && (
             <button
-              className="btn-green px-8"
+              className="btn-green px-8 cursor-pointer"
               onClick={handleUpload}
               disabled={!files.length}
             >
@@ -227,7 +230,10 @@ function App() {
             </button>
           )}
           {uploadStatus?.success && (
-            <button className="btn-purple px-8" onClick={handleDecompress}>
+            <button
+              className="btn-purple px-8 cursor-pointer"
+              onClick={handleDecompress}
+            >
               Decompress
             </button>
           )}
@@ -342,7 +348,7 @@ function App() {
       <div className="max-w-3xl mx-auto mt-10">
         <footer className="mt-10 text-center text-gray-600 text-sm">
           <p>All uploaded images will be automatically deleted after 1 hour.</p>
-          <p>All rights reserved © 2025 Lossy & Lossless Image Compression</p>
+          <p>All rights reserved © 2025 Image Compressor & Decompressor</p>
         </footer>
       </div>
     </div>
