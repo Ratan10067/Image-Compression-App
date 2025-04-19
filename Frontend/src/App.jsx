@@ -12,7 +12,7 @@ function App() {
   useEffect(() => {
     const deleteFilesInterval = setInterval(() => {
       axios
-        .delete("http://localhost:5000/api/cleanup")
+        .delete("https://image-compression-app-delta.vercel.app/api/cleanup")
         .then((response) => {
           console.log(response.data.message); // Log success message
         })
@@ -64,7 +64,7 @@ function App() {
     formData.append("type", compressionType);
     try {
       const { data } = await axios.post(
-        "http://localhost:5000/api/upload",
+        "https://image-compression-app-delta.vercel.app/api/upload",
         formData,
         { headers: { "Content-Type": "multipart/form-data" } }
       );
@@ -80,7 +80,7 @@ function App() {
     if (!decompressedImage) return alert("Upload first!");
     try {
       const { data } = await axios.post(
-        "http://localhost:5000/api/decompress",
+        "https://image-compression-app-delta.vercel.app/api/decompress",
         { filePath: decompressedImage, compressionType: compressionType },
         {
           headers: { "Content-Type": "application/json" },
